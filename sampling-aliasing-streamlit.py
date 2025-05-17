@@ -10,6 +10,8 @@ st.set_page_config(
     layout="wide"
 )
 
+t_end=1
+
 st.title("Sampling and Aliasing Demonstration")
 st.markdown("""
 ### How to Use This App
@@ -87,7 +89,7 @@ nyquist_rate = 2 * max(primary_freq, secondary_freq)
 fs_aliasing = st.sidebar.slider(
     "Aliasing Sampling Rate (Hz)",
     min_value=1,
-    max_value=int(nyquist_rate) - 1 if int(nyquist_rate) > 2 else 1,
+    max_value=int(nyquist_rate),# - 1 if int(nyquist_rate) > 2 else 1,
     value=min(int(nyquist_rate) - 5, max(1, int(nyquist_rate) // 2)),
     step=1,
     help="Sampling rate below the Nyquist rate (will cause aliasing and poor reconstruction)"
@@ -186,9 +188,9 @@ with tab1:
     )
 
     # Set x-axis range for better visualization
-    fig_time.update_xaxes(range=[0, 0.5], row=1, col=1)
-    fig_time.update_xaxes(range=[0, 0.5], row=2, col=1)
-    fig_time.update_xaxes(range=[0, 0.5], row=3, col=1)
+    fig_time.update_xaxes(range=[0, t_end], row=1, col=1)
+    fig_time.update_xaxes(range=[0, t_end], row=2, col=1)
+    fig_time.update_xaxes(range=[0, t_end], row=3, col=1)
 
     # Add more space between subplots
     fig_time.update_layout(height=900)
@@ -307,22 +309,43 @@ with tab2:
     )
 
     # Highlight aliased frequencies if applicable
-    if secondary_freq > fs_aliasing/2:
-        # Calculate the aliased frequency
-        aliased_freq = fs_aliasing - (secondary_freq % fs_aliasing)
-        if aliased_freq > fs_aliasing/2:
-            aliased_freq = fs_aliasing - aliased_freq
+    aliased_freqs = []
+
+    # Check primary signal for aliasing
+    if primary_freq > fs_aliasing/2:
+        # Calculate the aliased frequency for primary signal
+        aliased_freq_primary = fs_aliasing - (primary_freq % fs_aliasing)
+        if aliased_freq_primary > fs_aliasing/2:
+            aliased_freq_primary = fs_aliasing - aliased_freq_primary
+
+        aliased_freqs.append((aliased_freq_primary, 'Primary'))
 
         fig_freq.add_trace(
-            go.Scatter(x=[aliased_freq, aliased_freq], y=[0, max(yf_aliasing)*1.1],
+            go.Scatter(x=[aliased_freq_primary, aliased_freq_primary], y=[0, max(yf_aliasing)*1.1],
                       mode='lines', line=dict(color='purple', width=2, dash='dash'),
-                      name=f'Aliased Frequency ({aliased_freq:.1f} Hz)'),
+                      name=f'Aliased Primary ({aliased_freq_primary:.1f} Hz)'),
+            row=2, col=1
+        )
+
+    # Check secondary signal for aliasing
+    if secondary_freq > fs_aliasing/2:
+        # Calculate the aliased frequency for secondary signal
+        aliased_freq_secondary = fs_aliasing - (secondary_freq % fs_aliasing)
+        if aliased_freq_secondary > fs_aliasing/2:
+            aliased_freq_secondary = fs_aliasing - aliased_freq_secondary
+
+        aliased_freqs.append((aliased_freq_secondary, 'Secondary'))
+
+        fig_freq.add_trace(
+            go.Scatter(x=[aliased_freq_secondary, aliased_freq_secondary], y=[0, max(yf_aliasing)*1.1],
+                      mode='lines', line=dict(color='magenta', width=2, dash='dash'),
+                      name=f'Aliased Secondary ({aliased_freq_secondary:.1f} Hz)'),
             row=2, col=1
         )
 
     # Update layout for better visualization and increased spacing
     fig_freq.update_layout(
-        height=800,  # Increased from 700 to 800
+        height=900,  # Increased from 700 to 800
         xaxis_title="Frequency (Hz)",
         xaxis2_title="Frequency (Hz)",
         yaxis_title="Magnitude",
@@ -344,19 +367,26 @@ with tab2:
     st.plotly_chart(fig_freq, use_container_width=True)
 
     # Display aliasing explanation
-    if secondary_freq > fs_aliasing/2:
-        aliased_freq = fs_aliasing - (secondary_freq % fs_aliasing)
-        if aliased_freq > fs_aliasing/2:
-            aliased_freq = fs_aliasing - aliased_freq
-
+    if aliased_freqs:
+        print(aliased_freqs)
+        # Create a message about which frequencies are aliased
+        aliased_msg = ""
+        for freq, signal_type in aliased_freqs:
+            if signal_type == 'Primary':
+                aliased_msg += f"""
+                - The primary signal at {primary_freq} Hz appears as {freq:.1f} Hz"""
+            else:
+                aliased_msg += f"""
+                - The secondary signal at {secondary_freq} Hz appears as {freq:.1f} Hz"""
+        print(aliased_msg)
         st.warning(f"""
             **Aliasing Detected!**
 
-            The secondary signal at {secondary_freq} Hz is above the Nyquist frequency ({fs_aliasing/2} Hz)
+            One or more signal frequencies are above the Nyquist frequency ({fs_aliasing/2} Hz)
             for your chosen sampling rate of {fs_aliasing} Hz.
 
-            This causes the frequency to "fold back" and appear as a lower frequency at approximately
-            {aliased_freq:.1f} Hz in the sampled signal.
+            This causes the frequencies to "fold back" and appear as lower frequencies:
+            {aliased_msg}
 
             **Why this happens**: When sampling at {fs_aliasing} Hz, any frequency above {fs_aliasing/2} Hz
             (the Nyquist frequency) cannot be distinguished from a lower frequency. This is similar to how
@@ -368,7 +398,7 @@ with tab2:
             All signal frequencies are below the Nyquist frequency ({fs_aliasing/2} Hz) for your chosen
             aliasing sampling rate of {fs_aliasing} Hz.
 
-            Try increasing the secondary frequency to see aliasing effects!
+            Try increasing the primary or secondary frequency to see aliasing effects!
         """)
 
 with tab3:
@@ -422,7 +452,7 @@ with tab3:
         reconstructed_adequate = sinc_interp(t_adequate, sampled_adequate, t_recon)
         reconstructed_aliasing = sinc_interp(t_aliasing, sampled_aliasing, t_recon)
     except Exception as e:
-        st.error(f"Error in sinc interpolation: {e}")
+        st.error(f"Error in sinc interpolation: {e}, attempting with cubic splines")
         # Fall back to a simpler but less accurate interpolation
         from scipy import interpolate
         f_adequate = interpolate.interp1d(t_adequate, sampled_adequate, kind='cubic', bounds_error=False, fill_value="extrapolate")
@@ -479,7 +509,7 @@ with tab3:
 
     # Update layout for better visualization and increased spacing
     fig_recon.update_layout(
-        height=800,  # Increased from 700 to 800
+        height=900,
         xaxis_title="Time (s)",
         xaxis2_title="Time (s)",
         yaxis_title="Amplitude",
@@ -489,8 +519,8 @@ with tab3:
     )
 
     # Set x-axis range for better visualization
-    # fig_recon.update_xaxes(range=[0, 0.3], row=1, col=1)
-    # fig_recon.update_xaxes(range=[0, 0.3], row=2, col=1)
+    fig_recon.update_xaxes(range=[0, t_end], row=1, col=1)
+    fig_recon.update_xaxes(range=[0, t_end], row=2, col=1)
 
     st.plotly_chart(fig_recon, use_container_width=True)
 
@@ -518,15 +548,10 @@ with tab3:
 
     The reconstruction is performed using **sinc interpolation**, which is the theoretically perfect
     reconstruction method for bandlimited signals sampled above the Nyquist rate.
-
-    **Practical implications**: In real-world applications like audio recording, images, or sensor data,
-    sampling below the Nyquist rate results in information loss that cannot be recovered. This is why, for example,
-    CD-quality audio samples at 44.1 kHz - to capture frequencies up to about 20 kHz (the upper limit of human hearing).
     """.format(fs_adequate, fs_aliasing))
 
 # Add expanded educational resources at the bottom
 st.markdown("---")
-st.header("Educational Resources")
 
 # Two-column layout for key concepts
 col1, col2 = st.columns(2)
@@ -546,13 +571,11 @@ with col1:
 with col2:
     st.subheader("Experiment Ideas")
     st.markdown("""
-    Try these experiments to better understand sampling and aliasing:
-
     1. **Find the Sweet Spot**: Gradually decrease the adequate sampling rate until you start to see reconstruction errors. This is where you're approaching the Nyquist limit.
 
-    2. **Aliasing Patterns**: Set the secondary frequency much higher than the primary and use a very low sampling rate. Watch how the aliasing creates entirely new patterns.
+    2. **Aliasing Patterns**: Set the primary frequency much higher than the secondary and use a very low aliasing sampling rate. Watch how the aliasing creates entirely new patterns.
 
     3. **Single Frequency**: Set the secondary amplitude to 0 to work with just one frequency. This simplifies the visualization and makes it easier to understand the basic principles.
 
-    4. **Close to Nyquist**: Set sampling just barely above and just barely below the Nyquist rate to see the dramatic difference that this critical threshold makes.
+    4. **Close to Nyquist**: Set sampling just barely above and just barely below the Nyquist rate to see the dramatic difference that this critical threshold makes in the quality of reconstruction.
     """)
