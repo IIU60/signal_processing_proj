@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import signal
 from matplotlib.gridspec import GridSpec
 
 # Set the style
@@ -61,7 +60,7 @@ sampled_severe = generate_continuous_signal(t_severe)
 # Plot the different sampling rates
 ax2 = fig.add_subplot(gs[1, 0])
 ax2.plot(t_continuous, continuous_signal, 'b-', alpha=0.3, label='Original')
-ax2.stem(t_adequate, sampled_adequate, 'g-', markerfmt='go', basefmt=" ", 
+ax2.stem(t_adequate, sampled_adequate, 'g-', markerfmt='go', basefmt=" ",
          label=f'Sampling at {fs_adequate} Hz (>Nyquist)')
 ax2.set_title('Adequate Sampling (Above Nyquist Rate)')
 ax2.set_xlabel('Time (s)')
@@ -72,7 +71,7 @@ ax2.set_xlim(0, 0.5)  # Focus on the first half to see details better
 
 ax3 = fig.add_subplot(gs[1, 1])
 ax3.plot(t_continuous, continuous_signal, 'b-', alpha=0.3, label='Original')
-ax3.stem(t_aliasing, sampled_aliasing, 'r-', markerfmt='ro', basefmt=" ", 
+ax3.stem(t_aliasing, sampled_aliasing, 'r-', markerfmt='ro', basefmt=" ",
          label=f'Sampling at {fs_aliasing} Hz (<Nyquist)')
 ax3.set_title('Aliasing Due to Undersampling')
 ax3.set_xlabel('Time (s)')
@@ -127,7 +126,7 @@ plt.legend()
 # Proper reconstruction with adequate sampling
 plt.subplot(3, 1, 2)
 plt.plot(t_continuous, continuous_signal, 'b-', alpha=0.5, label='Original Signal')
-plt.stem(t_adequate, sampled_adequate, 'g-', markerfmt='go', basefmt=" ", 
+plt.stem(t_adequate, sampled_adequate, 'g-', markerfmt='go', basefmt=" ",
          label=f'Samples at {fs_adequate} Hz')
 
 # Reconstruct signal using sinc interpolation (ideal lowpass filtering)
@@ -147,7 +146,7 @@ plt.xlim(0, 0.3)  # Focus on a portion to see details better
 # Failed reconstruction with severe undersampling
 plt.subplot(3, 1, 3)
 plt.plot(t_continuous, continuous_signal, 'b-', alpha=0.5, label='Original Signal')
-plt.stem(t_severe, sampled_severe, 'r-', markerfmt='ro', basefmt=" ", 
+plt.stem(t_severe, sampled_severe, 'r-', markerfmt='ro', basefmt=" ",
          label=f'Samples at {fs_severe} Hz')
 
 # Attempt to reconstruct (will demonstrate aliasing)
